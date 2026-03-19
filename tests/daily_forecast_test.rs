@@ -36,6 +36,7 @@ use pi_inky_weather_epd::{
     dashboard::context::ContextBuilder,
     domain::models::{Astronomical, DailyForecast, Temperature},
 };
+use serial_test::serial;
 
 /// Create mock daily forecast data with exactly 7 days starting from a given date
 /// Dates are NaiveDate (local calendar days) to match the new domain model
@@ -75,7 +76,11 @@ fn create_mock_daily_forecast(start_date: NaiveDate, num_days: usize) -> Vec<Dai
 /// - day_index 0 = today (Oct 26) for sunrise/sunset only
 /// - day_index 1-6 fill day2-day7 with temp/icon data from Oct 27-Nov 1
 #[test]
+#[serial]
 fn test_timezone_bug_causes_missing_seventh_day() {
+    let original_tz = std::env::var("TZ").ok();
+    unsafe { std::env::set_var("TZ", "Australia/Melbourne") };
+
     // Fixed time: Oct 26, 2025, 9:00 AM Melbourne (UTC+11)
     // This is Oct 25, 2025, 22:00 UTC
     let clock =
@@ -138,4 +143,11 @@ fn test_timezone_bug_causes_missing_seventh_day() {
         context.day7_name, "NA",
         "FAILED: Day 7 name is 'NA' - timezone bug is present!"
     );
+
+    unsafe {
+        match original_tz {
+            Some(tz) => std::env::set_var("TZ", tz),
+            None => std::env::remove_var("TZ"),
+        }
+    }
 }

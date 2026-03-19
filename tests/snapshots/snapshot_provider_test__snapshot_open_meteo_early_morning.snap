@@ -31,7 +31,7 @@ expression: svg_content
 
     <!-- Current Day Information -->
     <text x="400" y="50" font-size="35" fill="white" text-anchor="middle">Saturday, 25 October</text>
-    <image x="0" y="0" width="200" height="180" href="static/fill-svg-static/partly-cloudy-night-rain.svg" />
+    <image x="0" y="0" width="200" height="180" href="static/fill-svg-static/extreme-night-rain.svg" />
 
 
     <!-- Current temperature summary -->
@@ -134,7 +134,7 @@ expression: svg_content
     <!-- Forecast for the next 6 days -->
     <svg x="292" y="30">
         <text x="50" y="65" text-anchor="middle" font-size="20" fill="white">Sun</text>
-        <image x="12" y="50" width="75" height="100" href="static/fill-svg-static/overcast-day-rain.svg" />
+        <image x="12" y="50" width="75" height="100" href="static/fill-svg-static/extreme-day-drizzle.svg" />
         <text y="155" font-size="20" fill="white">
             <tspan x="52" text-anchor="end">23°</tspan>
             <tspan x="52" text-anchor="middle">|</tspan>
@@ -144,7 +144,7 @@ expression: svg_content
 
     <svg x="373" y="30">
         <text x="50" y="65" text-anchor="middle" font-size="20" fill="white">Mon</text>
-        <image x="12" y="50" width="75" height="100" href="static/fill-svg-static/overcast-day-drizzle.svg" />
+        <image x="12" y="50" width="75" height="100" href="static/fill-svg-static/clear-day.svg" />
         <text y="155" font-size="20" fill="white">
             <tspan x="52" text-anchor="end">13°</tspan>
             <tspan x="52" text-anchor="middle">|</tspan>
@@ -164,7 +164,7 @@ expression: svg_content
 
     <svg x="535" y="30">
         <text x="50" y="65" text-anchor="middle" font-size="20" fill="white">Wed</text>
-        <image x="12" y="50" width="75" height="100" href="static/fill-svg-static/overcast-day.svg" />
+        <image x="12" y="50" width="75" height="100" href="static/fill-svg-static/clear-day.svg" />
         <text y="155" font-size="20" fill="white">
             <tspan x="52" text-anchor="end">18°</tspan>
             <tspan x="52" text-anchor="middle">|</tspan>
@@ -174,7 +174,7 @@ expression: svg_content
 
     <svg x="616" y="30">
         <text x="50" y="65" text-anchor="middle" font-size="20" fill="white">Thu</text>
-        <image x="12" y="50" width="75" height="100" href="static/fill-svg-static/overcast-day.svg" />
+        <image x="12" y="50" width="75" height="100" href="static/fill-svg-static/clear-day.svg" />
         <text y="155" font-size="20" fill="white">
             <tspan x="52" text-anchor="end">19°</tspan>
             <tspan x="52" text-anchor="middle">|</tspan>
@@ -184,7 +184,7 @@ expression: svg_content
 
     <svg x="697" y="30">
         <text x="50" y="65" text-anchor="middle" font-size="20" fill="white">Fri</text>
-        <image x="12" y="50" width="75" height="100" href="static/fill-svg-static/partly-cloudy-day-rain.svg" />
+        <image x="12" y="50" width="75" height="100" href="static/fill-svg-static/partly-cloudy-day-drizzle.svg" />
         <text y="155" font-size="20" fill="white">
             <tspan x="52" text-anchor="end">25°</tspan>
             <tspan x="52" text-anchor="middle">|</tspan>
