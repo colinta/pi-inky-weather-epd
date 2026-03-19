@@ -2,14 +2,14 @@ use crate::{
     clock::Clock,
     constants::{NOT_AVAILABLE, NOT_AVAILABLE_ICON_PATH},
     dashboard::chart::{GraphDataPath, HourlyForecastGraph},
-    domain::models::{DailyForecast, HourlyForecast},
+    domain::models::{DailyForecast, HourlyForecast, Temperature},
     errors::{DashboardError, Description},
     logger,
     utils::{find_max_item_between_dates, total_between_dates},
     weather::icons::{HumidityIconName, Icon, SunPositionIconName, UVIndexIcon},
     CONFIG,
 };
-use chrono::{DateTime, Local, NaiveDate, Timelike, Utc};
+use chrono::{DateTime, Local, NaiveDate, TimeZone, Timelike, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -36,7 +36,10 @@ pub struct Context {
     pub total_rain_today: String,
     pub temp_unit: String,
     pub current_wind_speed_unit: String,
-    pub current_hour_actual_temp: String,
+    pub daytime_average_temp: String,
+    pub daytime_average_temp_dual: String,
+    pub today_high_dual: String,
+    pub today_low_dual: String,
     pub current_hour_weather_icon: String,
     pub current_hour_feels_like: String,
     pub current_hour_wind_speed: String,
@@ -129,7 +132,10 @@ impl Default for Context {
             total_rain_today: NOT_AVAILABLE.to_string(),
             temp_unit: render_options.temp_unit.to_string(),
             current_wind_speed_unit: render_options.wind_speed_unit.to_string(),
-            current_hour_actual_temp: NOT_AVAILABLE.to_string(),
+            daytime_average_temp: NOT_AVAILABLE.to_string(),
+            daytime_average_temp_dual: NOT_AVAILABLE.to_string(),
+            today_high_dual: NOT_AVAILABLE.to_string(),
+            today_low_dual: NOT_AVAILABLE.to_string(),
             current_hour_weather_icon: not_available_icon_path.clone(),
             current_hour_feels_like: NOT_AVAILABLE.to_string(),
             current_hour_wind_speed: NOT_AVAILABLE.to_string(),
@@ -300,6 +306,16 @@ impl ContextBuilder {
             .collect()
     }
 
+    fn format_dual_temperature(temp: Temperature) -> String {
+        let celsius = temp.to_celsius();
+        let fahrenheit = temp.to_fahrenheit();
+        format!("{}°C / {}°F", celsius, fahrenheit)
+    }
+
+    fn format_optional_dual_temperature(temp: Option<Temperature>) -> String {
+        temp.map_or(NOT_AVAILABLE.to_string(), Self::format_dual_temperature)
+    }
+
     /// Assigns daily forecast data to the appropriate context fields.
     /// Handles missing data by setting "N/A" defaults.
     fn assign_day_data(&mut self, day_index: i32, forecast: Option<&DailyForecast>) {
@@ -316,7 +332,12 @@ impl ContextBuilder {
 
         match day_index {
             0 => {
-                // Day 0 (today) - show sunrise/sunset times
+                // Day 0 (today) - show sunrise/sunset times and today's high/low in dual units
+                self.context.today_high_dual =
+                    Self::format_optional_dual_temperature(forecast.and_then(|f| f.temp_max));
+                self.context.today_low_dual =
+                    Self::format_optional_dual_temperature(forecast.and_then(|f| f.temp_min));
+
                 if let Some(forecast) = forecast {
                     if let Some(ref astro) = forecast.astronomical {
                         // Sunrise/sunset are NaiveDateTime (already in local time)
@@ -626,6 +647,79 @@ impl ContextBuilder {
         )
     }
 
+    fn local_datetime_on(date: NaiveDate, hour: u32) -> Option<DateTime<Local>> {
+        let naive = date.and_hms_opt(hour, 0, 0)?;
+        Local
+            .from_local_datetime(&naive)
+            .earliest()
+            .or_else(|| Local.from_local_datetime(&naive).latest())
+    }
+
+    fn calculate_daytime_average_temperature(
+        hourly_forecast_data: &[HourlyForecast],
+        clock: &dyn Clock,
+    ) -> Option<Temperature> {
+        let local_today = clock.now_local().date_naive();
+        let window_start = Self::local_datetime_on(local_today, 9)?;
+        let window_end = Self::local_datetime_on(local_today, 21)?;
+
+        if window_end <= window_start {
+            return None;
+        }
+
+        let mut samples: Vec<(DateTime<Local>, Temperature)> = hourly_forecast_data
+            .iter()
+            .map(|forecast| (forecast.time.with_timezone(&Local), forecast.temperature))
+            .collect();
+        samples.sort_by_key(|(time, _)| *time);
+
+        let start_index = samples
+            .iter()
+            .rposition(|(time, _)| *time <= window_start)
+            .or_else(|| samples.iter().position(|(time, _)| *time >= window_start))?;
+
+        let mut weighted_sum = 0.0_f32;
+        let mut covered_seconds = 0_i64;
+
+        for index in start_index..samples.len() {
+            let (sample_time, sample_temp) = samples[index];
+            if sample_time >= window_end {
+                break;
+            }
+
+            let segment_start = if sample_time <= window_start {
+                window_start
+            } else {
+                sample_time
+            };
+
+            let next_time = samples
+                .get(index + 1)
+                .map(|(time, _)| *time)
+                .unwrap_or(window_end);
+            let segment_end = std::cmp::min(next_time, window_end);
+
+            if segment_end <= segment_start {
+                continue;
+            }
+
+            let segment_seconds = segment_end
+                .signed_duration_since(segment_start)
+                .num_seconds();
+            weighted_sum += sample_temp.value * segment_seconds as f32;
+            covered_seconds += segment_seconds;
+        }
+
+        if covered_seconds <= 0 {
+            return None;
+        }
+
+        Some(Temperature::new(
+            weighted_sum / covered_seconds as f32,
+            samples[start_index].1.unit,
+        ))
+    }
+
     fn populate_graph_data(
         &mut self,
         hourly_forecast_data: &[HourlyForecast],
@@ -635,6 +729,8 @@ impl ContextBuilder {
         clock: &dyn Clock,
     ) {
         let mut x = 0;
+        let daytime_average_temp =
+            Self::calculate_daytime_average_temperature(hourly_forecast_data, clock);
         hourly_forecast_data
             .iter()
             .filter(|forecast| {
@@ -642,7 +738,7 @@ impl ContextBuilder {
             })
             .for_each(|forecast| {
                 if x == 0 {
-                    self.with_current_hour_data(forecast, clock);
+                    self.with_current_hour_data(forecast, daytime_average_temp, clock);
                     self.populate_current_hour_table(forecast)
                 } else if x >= 24 {
                     logger::warning(
@@ -673,9 +769,12 @@ impl ContextBuilder {
     fn with_current_hour_data(
         &mut self,
         current_hour: &HourlyForecast,
+        daytime_average_temp: Option<Temperature>,
         clock: &dyn Clock,
     ) -> &mut Self {
-        self.context.current_hour_actual_temp = current_hour.temperature.to_string();
+        let summary_temp = daytime_average_temp.unwrap_or(current_hour.temperature);
+        self.context.daytime_average_temp = summary_temp.to_string();
+        self.context.daytime_average_temp_dual = Self::format_dual_temperature(summary_temp);
         self.context.current_hour_weather_icon = current_hour.icon_path();
         self.context.current_hour_feels_like = current_hour.apparent_temperature.to_string();
         self.context.current_day_date = clock

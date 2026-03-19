@@ -121,9 +121,17 @@ fn test_with_daily_forecast_data_new_york_est() {
     assert_eq!(context.day7_name, "Tue", "Day 7 should be Tuesday");
 
     // Verify temperatures are correctly rounded and assigned
-    // Day 0 (today, Dec 17) - only sunrise/sunset used
+    // Day 0 (today, Dec 17) - sunrise/sunset and dual-unit high/low used
     assert_eq!(context.sunrise_time, "07:19", "Sunrise time incorrect");
     assert_eq!(context.sunset_time, "16:33", "Sunset time incorrect");
+    assert_eq!(
+        context.today_high_dual, "10°C / 50°F",
+        "Today's high dual temp incorrect"
+    );
+    assert_eq!(
+        context.today_low_dual, "-3°C / 27°F",
+        "Today's low dual temp incorrect"
+    );
 
     // Day 2 (Thu, Dec 18): 10.3°C → 10, -1.2°C → -1
     assert_eq!(context.day2_maxtemp, "10", "Day 2 max temp incorrect");
