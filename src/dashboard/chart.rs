@@ -1,5 +1,11 @@
 use crate::{
-    clock::Clock, constants::DEFAULT_AXIS_LABEL_FONT_SIZE, logger, weather::icons::UVIndexIcon,
+    clock::Clock,
+    configs::settings::TemperatureUnit,
+    constants::DEFAULT_AXIS_LABEL_FONT_SIZE,
+    domain::models::Temperature,
+    logger,
+    weather::icons::UVIndexIcon,
+    CONFIG,
 };
 use anyhow::Error;
 use strum_macros::Display;
@@ -475,6 +481,16 @@ impl HourlyForecastGraph {
         )
     }
 
+    fn minimum_visible_temperature_range() -> (f32, f32) {
+        match CONFIG.render_options.temp_unit {
+            TemperatureUnit::C => (0.0, 20.0),
+            TemperatureUnit::F => (
+                Temperature::celsius(0.0).to_fahrenheit().value,
+                Temperature::celsius(20.0).to_fahrenheit().value,
+            ),
+        }
+    }
+
     fn initialize_x_y_bounds(&mut self) {
         for curve in &self.curves {
             let min_y_data = curve
@@ -501,6 +517,10 @@ impl HourlyForecastGraph {
             self.starting_x = starting_x_data;
             self.ending_x = ending_x_data;
         }
+
+        let (minimum_visible_temp, maximum_visible_temp) = Self::minimum_visible_temperature_range();
+        self.min_y = self.min_y.min(minimum_visible_temp);
+        self.max_y = self.max_y.max(maximum_visible_temp);
 
         // println!(
         //     "starting x: {}, ending x: {}",
